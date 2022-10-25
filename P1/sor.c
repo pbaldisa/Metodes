@@ -4,8 +4,8 @@
 #include <stdbool.h>
 
 #define A 1.0
-#define B 1.0
-#define C 0.0
+#define B 0.0
+#define C 1.0
 #define D 0.0
 #define E 0.0
 #define F 0.0
@@ -20,6 +20,7 @@ double matrixInfNorm(double** m1, double** m2, int n);
 int sor(double** u, double x[], double a[9], int n, double w, double error, int maxIter);
 double calculateErrorBound(double delta, double old_delta);
 void writeSolutionFile(double** u, double x[], int n);
+double checkRealError(double** u, double x[], int n);
 
 int main(){
 
@@ -43,20 +44,15 @@ int main(){
     printf("Factor de relaxació: ");
     scanf("%lf", &w);
 
-    //nombre d'iteracions que ha fet el mètode iteratiu 
-    int totalIter;
-
     /*
     Crea els vectors i matrius a usar
     */
     //vectors que representen els punts x, y on avaluem la solució
     double x[n+2];
-    //vector solució en forma de matriu co a iteracio per sor; i s la solució exacta
-    double** s = (double**)calloc((n+2),sizeof(double*));
+    //vector solució en forma de matriu co a iteracio per sor
     double** u = (double**)calloc((n+2),sizeof(double*));   //representa la solució trobada en la iteració actual
     for(int i=0; i<(n+2); i++){
         u[i] = (double*)calloc((n+2),sizeof(double));
-        s[i] = (double*)calloc((n+2),sizeof(double));
     } 
 
     double h = 1/(double)(n+1); //pas de discretització
@@ -69,25 +65,19 @@ int main(){
     assignValuesZero(x, u, h, n);
 
     //resol per sor
-    totalIter = sor(u, x, a, n, w, error, maxIter); 
+    printf("El nombre d'iteracions necessari ha estat: %d\n", sor(u, x, a, n, w, error, maxIter));
 
     //Escriu la solució en un fitxer
     writeSolutionFile(u, x, n);
 
-    printf("El nombre d'iteracions necessari ha estat: %d\n", totalIter);
-
-    //Calcula la solució esperada
-    calculateSolution(s, x, n);
-
-    printf("L'error real ha estat de %E", matrixInfNorm(s, u, n+2));
+    //Calcula l'error real, comparant amb la funció coneguda
+    printf("L'error real ha estat de %E\n", checkRealError(u, x, n+2));
 
     //allibera els vectors
     for(int i=0; i<(n+2); i++){
         free(u[i]);
-        free(s[i]);
     } 
     free(u);
-    free(s);
     
     return 0;
 }
@@ -140,9 +130,13 @@ int sor(double** u, double x[], double a[9], int n, double w,  double error, int
         old_error_aprox = error_aprox;
 
         iter++;
+        //Per no carregar la pantalla, imprimeix el quocient d'error cada 1000 iteracions
+        if(iter%1000==0){
+            printf("\nQuocient d'error a iteració %d: %lf\n", iter, error_q);
+        }
     }while((iter < maxIter) && (error_aprox>error));
 
-    printf("\nEl quocient d'error ha estat %lf\n", error_q);
+    printf("\nQuocient d'error a iteració %d: %lf\n", iter, error_q);
 
     return iter;
 }
@@ -253,10 +247,27 @@ void writeSolutionFile(double** u, double x[], int n){
     fprintf(fptr,"x, y, u\n");
     for(int i=1; i<n+1; i++){
         for(int j=1; j<n+1; j++){
-            fprintf(fptr, "%lf, %lf, %lf\n", x[i], x[j], u[i][j]);
+            fprintf(fptr, "%lf, %lf, %+.6le\n", x[i], x[j], u[i][j]);
         }
     }
     fclose(fptr);
+}
+
+/*
+Funció que retorna l'error real comparant-ho amb la funció coneguda
+*/
+double checkRealError(double** u, double x[], int n){
+    double max_abs_val = 0;
+    double current;
+    for(int i=0; i<n; i++){
+        for(int j=0; j<n; j++){
+            current = fabs(u[i][j]-p(x[i], x[j]));
+            if(current>max_abs_val){
+                max_abs_val = current;
+            }
+        }
+    }
+    return max_abs_val;
 }
 
 /*
