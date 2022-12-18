@@ -27,12 +27,13 @@ Point perpendicular(Point X);
 void computeInitialPoints(Point B, Point points[4], Point initialPoints[16]);
 Point sumPoints(Point points[], int n);
 Point sumTwoPoints(Point p1, Point p2);
+Point substractTwoPoints(Point p1, Point p2);
 Point mulPoint(Point p, double k);
 Point divPoint(Point p, double k);
 double norm(Point p);
 Point Fun(Point X, Point X0, Point points[4], Point centre);
 
-void predictorCorrector(Point initial, Point points[4], FILE **f);
+void predictorCorrector(Point initial, Point points[4], FILE *f);
 Point predictor(Point initial, Point points[4]);
 Point corrector(Point initial, Point centre, Point X0, Point points[4]);
 
@@ -41,8 +42,10 @@ int main(){
     //LLegeix els punts del pla que introdueix l'usuari
     printf("Introdueix els 4 punts del pla:\n");
     //Conjunt de 4 punts a partir del NIUB de l'usuari
-    Point points[4];
-    readPoints(points);
+
+    //Point points[4];
+    //readPoints(points);
+    Point points[4] = {(Point){2.0, 0.0}, (Point){1.0, 5.0}, (Point){0.0, 2.0}, (Point){7.0, 0.0}};
 
     //Calcula el baricentre dels punts
     Point B = baricentre(points);
@@ -60,9 +63,11 @@ int main(){
         fprintf(f, "ind x y");
         //Punt inicial per trobar la corba
         Point initial = initialPoints[i];
+        printf("Punt inicial: (%lf, %lf)\n", initial.x, initial.y);
+        printf("Punt inicial a h: %lf\n", h(initial, initial, points));
 
         //Calcula predicció-correcció per aquest punt inicial (escriu els punts en un fitxer i va imprimint per pantalla)
-        predictorCorrector(initial, points, &f);
+        predictorCorrector(initial, points, f);
         fclose(f);
     }
 }
@@ -71,24 +76,27 @@ int main(){
     Funció que donat un punt inicial i els 4 punts del pla escriu un fitxer amb els punts de la corba que
     va trobant amb el mètode preidctor-corrector.
 */
-void predictorCorrector(Point initial, Point points[4], FILE **f){
-    Point X0 = initial;
+void predictorCorrector(Point initial, Point points[4], FILE *f){
+    Point X0 = initial; //fa 0 la corba h
+    Point X1, X2;
     
     for(int index=0; index<POINTS_IN_CURVE; index++){
         // Calcula la predicció del punt següent
-        Point X1 = predictor(X0, points);
+        X1 = predictor(X0, points);
         // Calcula la correcció del punt següent
-        Point X2 = corrector(X1, X0, initial, points);
+        X2 = corrector(X1, X0, initial, points);
 
         // Comprova que no ha fet la volta
-        if (dist(initial, X1) < DELTA){
+        if (dist(initial, X2) < DELTA){
             printf("Ha fet la volta\n");
             break;
         }
+        printf("hello\n");
         // Escriu el punt trobat al fitxer       
         fprintf(f, "%d %lf %lf", index, X2.x, X2.y);
         // Actualitza el punt inicial per a la següent iteració
         X0 = X2;
+        printf("index: %d\n", index);
     }
 }
 
@@ -99,8 +107,10 @@ void predictorCorrector(Point initial, Point points[4], FILE **f){
 */
 Point predictor(Point initial, Point points[4]){
     Point grad = gradh(initial, points);
-    Point perp = perpendicular(grad);
-    if (abs(perp.x) < TOL && abs(perp.y) < TOL){
+    printf("Gradient: (%lf, %lf)\n", grad.x, grad.y);
+    Point perp = mulPoint(perpendicular(grad),-1.0);
+    printf("Perpendicular: (%lf, %lf)\n", perp.x, perp.y);
+    if (fabs(perp.x) < TOL && fabs(perp.y) < TOL){
         printf("El gradient és zero\n");
         exit (EXIT_FAILURE);
     }
@@ -114,7 +124,7 @@ Point predictor(Point initial, Point points[4]){
 
 // Funció que volem fer zero al corrector amb el mètode de Newton
 Point Fun(Point X, Point X0, Point points[4], Point centre){
-    Point F = {h(X, X0, points), dist(X, centre) - pow(DELTA,2)};
+    Point F = {h(X, X0, points), pow(X.x-centre.x,2) + pow(X.y-centre.y,2) - pow(DELTA,2)};
     return F;
 }
 
@@ -127,26 +137,35 @@ Point Fun(Point X, Point X0, Point points[4], Point centre){
 Point corrector(Point pred, Point centre, Point X0, Point points[4]){
     Point X_prev = pred;
     int i = 0;
+    Point grad, F, X;
+    double dif, det;
     for (int i=0; i<NEWTON_ITER; i++){
-        Point grad = gradh(X_prev, points);
-        Point F = Fun(X_prev, X0, points, centre);
+        //gradient de la funció h (primera fila de la matriu DF)
+        grad = gradh(X_prev, points);
+        F = Fun(X_prev, X0, points, centre);
+        //printf("F: (%lf, %lf)\n", F.x, F.y);
+        //printf("grad: (%e, %e)\n", grad.x, grad.y);
+        //printf("X_prev: (%e, %e)\n", X_prev.x, X_prev.y);
         // Determinant de DF (per la inversa de la matriu)
-        double det = 2 * (grad.x * (X_prev.y - pred.y) - grad.y * (X_prev.x - pred.x));
+        det = 2.0 * (grad.x * (X_prev.y - centre.y) - grad.y * (X_prev.x - centre.x));
         // Producte de la inversa de DF per F
-        Point aux = {2 * (X_prev.y - pred.y) * F.x - grad.y * F.y, -2 * (X_prev.x - pred.x) * F.x - grad.x * F.y};
+        Point aux = {2.0 * (X_prev.y - centre.y) * F.x - grad.y * F.y, -2.0 * (X_prev.x - centre.x) * F.x + grad.x * F.y};
         aux = divPoint(aux, det);
         // X_i+1 = X_i - DF^-1 * F
-        Point X = sumTwoPoints(X_prev, mulPoint(aux, -1));
+        X = substractTwoPoints(X_prev, aux);
+
+        dif = dist(X, X_prev);
         //imprimeix la correcció per pantalla
-        printf("#corr: k=%d x=(%lf, %lf) dlf=%lf\n", i, X.x, X.y, dist(X, X_prev));
+        printf("#corr: k=%d x=(%lf, %lf) dif=%e\n", i, X.x, X.y, dif);
         // Si la distància entre X_i i X_i+1 és menor que la precisió desitjada, retornem X_i+1
-        if (dist(X, X_prev) < PRECISION){
+        if (dif < PRECISION){
             return X;
         }
         X_prev = X;
     }
-    //S'han acabat les iteracions i no ha trobat un punt
     exit (EXIT_FAILURE);
+    //S'han acabat les iteracions i no ha trobat un punt
+    return X;
     
     /*while (h1 != 0 && i < NETWONITER){
         X = sumTwoPoints(X0, mulPoint(gradh(X0, points), -h0/dist(X0, initial)));
@@ -244,6 +263,14 @@ Point sumTwoPoints(Point p1, Point p2){
     sum.x = p1.x + p2.x;
     sum.y = p1.y + p2.y;
     return sum;
+}
+
+//subtract two points
+Point substractTwoPoints(Point p1, Point p2){
+    Point sub;
+    sub.x = p1.x - p2.x;
+    sub.y = p1.y - p2.y;
+    return sub;
 }
 
 //Multiply point by a scalar
