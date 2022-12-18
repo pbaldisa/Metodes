@@ -49,8 +49,6 @@ int main(){
     // Punts que introdueix l'usuari
     Point points[4];
     readPoints(points);
-    // Punts del meu NIUB per testeig ràpid
-    //Point points[4] = {(Point){2.0, 0.0}, (Point){1.0, 5.0}, (Point){0.0, 2.0}, (Point){7.0, 0.0}};
 
     //Calcula el baricentre dels punts
     Point B = baricentre(points);
