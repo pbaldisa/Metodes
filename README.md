@@ -1,4 +1,4 @@
-# Metodes II
+# Mètodes II
 
 In this repository you can find the 2 programming assignments for my Numerical Methods II class (Mathematics UB). Both were programmed in C.
 
